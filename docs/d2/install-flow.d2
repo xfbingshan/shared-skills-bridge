@@ -1,0 +1,147 @@
+direction: down
+
+start: {
+  label: |md
+    **`install(skills, platform, mode)`**
+  |
+  shape: oval
+  style: {
+    fill: "#E8F5E9"
+    stroke: "#4CAF50"
+    stroke-width: 2
+  }
+}
+
+resolve_target: {
+  label: |md
+    **Resolve target directory**
+    ```
+    Kimi: ~/.kimi/skills/{name}
+    Hermes: ~/.hermes/skills/shared/{name}
+    ```
+  |
+  shape: rectangle
+  style: {
+    fill: "#E3F2FD"
+    stroke: "#2196F3"
+    stroke-width: 2
+  }
+}
+
+choose_platform: {
+  label: |md
+    **Platform = ?**
+  |
+  shape: diamond
+  style: {
+    fill: "#FFF3E0"
+    stroke: "#FF9800"
+    stroke-width: 2
+  }
+}
+
+kimi_adapter: {
+  label: |md
+    **Kimi Adapter**
+    ```
+    - Replace ${HERMES_SKILL_DIR}
+    - Remove ${HERMES_SESSION_ID}
+    - Convert `!`cmd`` → [shell: cmd]
+    ```
+  |
+  shape: rectangle
+  style: {
+    fill: "#E3F2FD"
+    stroke: "#2196F3"
+    stroke-width: 2
+  }
+}
+
+hermes_pass: {
+  label: |md
+    **Hermes Adapter**
+    ```
+    - Pass through (no changes)
+    ```
+  |
+  shape: rectangle
+  style: {
+    fill: "#F3E5F5"
+    stroke: "#9C27B0"
+    stroke-width: 2
+  }
+}
+
+choose_mode: {
+  label: |md
+    **Mode = ?**
+  |
+  shape: diamond
+  style: {
+    fill: "#FFF3E0"
+    stroke: "#FF9800"
+    stroke-width: 2
+  }
+}
+
+copy_step: {
+  label: |md
+    **`shutil.copytree()`**
+    ```
+    - Copy with adapter cleanup
+    - Overwrite if --force
+    ```
+  |
+  shape: rectangle
+  style: {
+    fill: "#E8F5E9"
+    stroke: "#4CAF50"
+    stroke-width: 2
+  }
+}
+
+link_step: {
+  label: |md
+    **`os.symlink()` or Junction**
+    ```
+    - Create symbolic link
+    - Windows: fallback to junction
+    ```
+  |
+  shape: rectangle
+  style: {
+    fill: "#E8F5E9"
+    stroke: "#4CAF50"
+    stroke-width: 2
+  }
+}
+
+result: {
+  label: |md
+    **Return `List[InstallResult]`**
+    ```
+    COPIED / LINKED / SKIPPED / ERROR
+    ```
+  |
+  shape: oval
+  style: {
+    fill: "#E8F5E9"
+    stroke: "#4CAF50"
+    stroke-width: 3
+  }
+}
+
+start -> resolve_target
+resolve_target -> choose_platform
+
+choose_platform -> kimi_adapter: KIMI
+choose_platform -> hermes_pass: HERMES
+
+kimi_adapter -> choose_mode
+hermes_pass -> choose_mode
+
+choose_mode -> copy_step: COPY
+choose_mode -> link_step: LINK
+
+copy_step -> result
+link_step -> result

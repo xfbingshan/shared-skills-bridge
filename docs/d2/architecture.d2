@@ -1,0 +1,231 @@
+direction: down
+
+classes: {
+  source: {
+    style: {
+      fill: "#E8F5E9"
+      stroke: "#4CAF50"
+      stroke-width: 2
+      border-radius: 8
+    }
+  }
+  module: {
+    style: {
+      fill: "#E3F2FD"
+      stroke: "#2196F3"
+      stroke-width: 2
+      border-radius: 8
+    }
+  }
+  target: {
+    style: {
+      fill: "#FFF3E0"
+      stroke: "#FF9800"
+      stroke-width: 2
+      border-radius: 8
+    }
+  }
+  skill: {
+    style: {
+      fill: "#F1F8E9"
+      stroke: "#8BC34A"
+      stroke-width: 1
+      border-radius: 4
+    }
+  }
+}
+
+shared_source: {
+  label: |md
+    **shared-skills/**  
+    *(Source Directory)*
+  |
+  class: source
+  shape: rectangle
+
+  skill1: {
+    label: |md
+      **git-commit-guide/**  
+      SKILL.md
+    |
+    class: skill
+    shape: rectangle
+    width: 110
+    height: 60
+  }
+  skill2: {
+    label: |md
+      **clean-code/**  
+      SKILL.md
+    |
+    class: skill
+    shape: rectangle
+    width: 110
+    height: 60
+  }
+  skill3: {
+    label: |md
+      **clean-architecture/**  
+      SKILL.md
+    |
+    class: skill
+    shape: rectangle
+    width: 110
+    height: 60
+  }
+  skill4: {
+    label: |md
+      **karpathy-guidelines/**  
+      SKILL.md
+    |
+    class: skill
+    shape: rectangle
+    width: 110
+    height: 60
+  }
+}
+
+core_modules: {
+  label: |md
+    **Core Modules**
+  |
+  style: {
+    fill: "transparent"
+    stroke: "#666"
+    stroke-dash: 5
+    border-radius: 8
+  }
+
+  scanner: {
+    label: |md
+      **Bidirectional Scanner**  
+      `bidirectional.py`  
+      Discover additions on both sides
+    |
+    class: module
+    shape: rectangle
+  }
+
+  installer: {
+    label: |md
+      **Installer**  
+      `installer.py`  
+      Copy / Link / Diff-check
+    |
+    class: module
+    shape: rectangle
+  }
+
+  scheduler: {
+    label: |md
+      **Scheduler**  
+      `scheduler.py`  
+      Cross-platform cron tasks
+    |
+    class: module
+    shape: rectangle
+  }
+}
+
+targets: {
+  label: |md
+    **Target Platforms**
+  |
+  style: {
+    fill: "transparent"
+    stroke: "#666"
+    stroke-dash: 5
+    border-radius: 8
+  }
+
+  kimi: {
+    label: |md
+      **~/.kimi/skills/**  
+      *(Kimi Platform)*
+    |
+    class: target
+    shape: rectangle
+  }
+
+  hermes: {
+    label: |md
+      **~/.hermes/skills/shared/**  
+      *(Hermes Platform)*
+    |
+    class: target
+    shape: rectangle
+  }
+
+  cron: {
+    label: |md
+      **schtasks / launchd / cron**  
+      *(Scheduled Sync)*
+    |
+    class: target
+    shape: rectangle
+  }
+}
+
+# Connections
+shared_source -> core_modules.scanner: scan & discover {
+  style: {
+    stroke: "#666"
+    stroke-dash: 3
+  }
+}
+shared_source -> core_modules.installer: install / sync {
+  style: {
+    stroke: "#666"
+    stroke-dash: 3
+  }
+}
+
+scanner -> hermes: discover additions {
+  style: {
+    stroke: "#2196F3"
+    stroke-width: 2
+  }
+}
+scanner -> kimi: discover additions {
+  style: {
+    stroke: "#2196F3"
+    stroke-width: 2
+  }
+}
+
+installer -> kimi: copy / link {
+  style: {
+    stroke: "#4CAF50"
+    stroke-width: 2
+  }
+}
+installer -> hermes: copy / link {
+  style: {
+    stroke: "#4CAF50"
+    stroke-width: 2
+  }
+}
+
+scheduler -> installer: trigger every N min {
+  style: {
+    stroke: "#FF9800"
+    stroke-width: 2
+    stroke-dash: 5
+  }
+}
+
+# Bidirectional arrow (feedback loop)
+kimi -> shared_source: new skills back to source {
+  style: {
+    stroke: "#E91E63"
+    stroke-width: 2
+    stroke-dash: 5
+  }
+}
+hermes -> shared_source: new skills back to source {
+  style: {
+    stroke: "#E91E63"
+    stroke-width: 2
+    stroke-dash: 5
+  }
+}

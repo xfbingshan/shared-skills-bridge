@@ -2,31 +2,7 @@
 
 ## 1. 架构概览
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         shared-skills/ (源目录)                       │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
-│  │ my-skill-1/  │  │ my-skill-2/  │  │ my-skill-3/  │              │
-│  │  SKILL.md    │  │  SKILL.md    │  │  SKILL.md    │              │
-│  │  scripts/    │  │  references/ │  │  assets/     │              │
-│  └──────────────┘  └──────────────┘  └──────────────┘              │
-└─────────────────────────────────────────────────────────────────────┘
-                            │
-            ┌───────────────┼───────────────┐
-            ▼               ▼               ▼
-   ┌─────────────────┐ ┌──────────────┐ ┌──────────────────┐
-│  Bidirectional    │ │  Installer   │ │  Scheduler       │
-│  Scanner          │ │  (copy/link) │ │  (Win/macOS/Lin) │
-│  (Hermes/Kimi)    │ │              │ │                  │
-└────────┬──────────┘ └──────┬───────┘ └────────┬─────────┘
-         │                   │                  │
-         ▼                   ▼                  ▼
-   ┌─────────────┐    ┌─────────────┐   ┌─────────────┐
-   │ ~/.kimi/    │    │ ~/.hermes/  │   │ schtasks/   │
-   │  skills/    │    │  skills/    │   │ launchd/    │
-   │  (Kimi)     │    │  (Hermes)   │   │ cron/       │
-   └─────────────┘    └─────────────┘   └─────────────┘
-```
+![Architecture Overview](d2/architecture.svg)
 
 ## 2. 模块划分
 
@@ -69,46 +45,16 @@ class InstallResult(Enum):
 ## 4. 核心流程
 
 ### 4.1 扫描流程
-```
-scan(source_dir) -> List[Skill]
-  └─ 遍历 source_dir 下直接子目录
-     └─ 若子目录包含 SKILL.md
-        └─ 解析 frontmatter（提取 name, description）
-           └─ 若 name 和 description 存在 → 生成 Skill 对象
-```
+![Scan Flow](d2/scan-flow.svg)
 
 ### 4.2 正向安装流程
-```
-install(skills, platform, mode=COPY)
-  ├─ Kimi: target = resolve_kimi_dir() / skill.name
-  ├─ Hermes: target = resolve_hermes_dir() / skill.name
-  └─ 遍历每个 skill
-     ├─ 若 mode == COPY:
-     │   └─ shutil.copytree(source, target)
-     │      └─ Kimi 模式：经 adapter 清理 Hermes 特有语法
-     └─ 若 mode == LINK:
-        └─ os.symlink(source, target) 或 Windows junction
-```
+![Install Flow](d2/install-flow.svg)
 
 ### 4.3 双向同步流程
-```
-bidirectional_sync(shared_source_dir)
-  ├─ discover_hermes_additions()
-  │   └─ scan(~/.hermes/skills/) → 对比 .hermes-baseline.json
-  │      └─ 新 skill → sync_hermes_to_shared() → shared_source_dir
-  ├─ discover_kimi_additions()
-  │   └─ scan(~/.kimi/skills/) → 对比 .kimi-baseline.json
-  │      └─ 新 skill → sync_kimi_to_shared() → shared_source_dir
-  └─ forward_sync(shared_source_dir → both platforms)
-```
+![Bidirectional Flow](d2/bidirectional-flow.svg)
 
 ### 4.4 差异检测流程
-```
-check_sync(source_skills, platform)
-  └─ 对比源目录与目标目录
-     ├─ 源有目标无 → ADD
-     └─ 源有目标有且内容不同 → UPDATE
-```
+![Check Flow](d2/check-flow.svg)
 
 ## 5. 平台适配策略
 

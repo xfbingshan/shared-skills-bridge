@@ -1,0 +1,172 @@
+direction: down
+
+start: {
+  label: |md
+    **`bidirectional_sync(shared_source_dir)`**
+  |
+  shape: oval
+  style: {
+    fill: "#E8F5E9"
+    stroke: "#4CAF50"
+    stroke-width: 2
+  }
+}
+
+hermes_branch: {
+  label: |md
+    **Discover Hermes Additions**
+    ```
+    scan(~/.hermes/skills/)
+    vs .hermes-baseline.json
+    ```
+  |
+  shape: rectangle
+  style: {
+    fill: "#E3F2FD"
+    stroke: "#2196F3"
+    stroke-width: 2
+  }
+}
+
+kimi_branch: {
+  label: |md
+    **Discover Kimi Additions**
+    ```
+    scan(~/.kimi/skills/)
+    vs .kimi-baseline.json
+    ```
+  |
+  shape: rectangle
+  style: {
+    fill: "#E3F2FD"
+    stroke: "#2196F3"
+    stroke-width: 2
+  }
+}
+
+new_hermes: {
+  label: |md
+    **New skills found?**
+  |
+  shape: diamond
+  style: {
+    fill: "#FFF3E0"
+    stroke: "#FF9800"
+    stroke-width: 2
+  }
+}
+
+new_kimi: {
+  label: |md
+    **New skills found?**
+  |
+  shape: diamond
+  style: {
+    fill: "#FFF3E0"
+    stroke: "#FF9800"
+    stroke-width: 2
+  }
+}
+
+sync_h2s: {
+  label: |md
+    **`sync_hermes_to_shared()`**
+    ```
+    Copy new Hermes skills
+    → shared_source_dir
+    ```
+  |
+  shape: rectangle
+  style: {
+    fill: "#F3E5F5"
+    stroke: "#9C27B0"
+    stroke-width: 2
+  }
+}
+
+sync_k2s: {
+  label: |md
+    **`sync_kimi_to_shared()`**
+    ```
+    Copy new Kimi skills
+    → shared_source_dir
+    ```
+  |
+  shape: rectangle
+  style: {
+    fill: "#F3E5F5"
+    stroke: "#9C27B0"
+    stroke-width: 2
+  }
+}
+
+update_baseline_h: {
+  label: |md
+    **Update `.hermes-baseline.json`**
+  |
+  shape: rectangle
+  style: {
+    fill: "#E8F5E9"
+    stroke: "#4CAF50"
+    stroke-width: 2
+  }
+}
+
+update_baseline_k: {
+  label: |md
+    **Update `.kimi-baseline.json`**
+  |
+  shape: rectangle
+  style: {
+    fill: "#E8F5E9"
+    stroke: "#4CAF50"
+    stroke-width: 2
+  }
+}
+
+forward_sync: {
+  label: |md
+    **`forward_sync()`**
+    ```
+    shared_source_dir → Kimi & Hermes
+    ```
+  |
+  shape: rectangle
+  style: {
+    fill: "#E8F5E9"
+    stroke: "#4CAF50"
+    stroke-width: 3
+  }
+}
+
+done: {
+  label: |md
+    **Done**
+  |
+  shape: oval
+  style: {
+    fill: "#E8F5E9"
+    stroke: "#4CAF50"
+    stroke-width: 3
+  }
+}
+
+# Flow
+start -> hermes_branch
+start -> kimi_branch
+
+hermes_branch -> new_hermes
+kimi_branch -> new_kimi
+
+new_hermes -> sync_h2s: Yes
+new_hermes -> update_baseline_h: No
+sync_h2s -> update_baseline_h
+
+new_kimi -> sync_k2s: Yes
+new_kimi -> update_baseline_k: No
+sync_k2s -> update_baseline_k
+
+update_baseline_h -> forward_sync
+update_baseline_k -> forward_sync
+
+forward_sync -> done

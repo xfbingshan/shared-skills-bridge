@@ -1,0 +1,123 @@
+direction: down
+
+start: {
+  label: |md
+    **`scan(source_dir)`**
+  |
+  shape: oval
+  style: {
+    fill: "#E8F5E9"
+    stroke: "#4CAF50"
+    stroke-width: 2
+  }
+}
+
+iterate: {
+  label: |md
+    **Iterate direct subdirectories**
+  |
+  shape: rectangle
+  style: {
+    fill: "#E3F2FD"
+    stroke: "#2196F3"
+    stroke-width: 2
+  }
+}
+
+check_skillmd: {
+  label: |md
+    **Contains `SKILL.md`?**
+  |
+  shape: diamond
+  style: {
+    fill: "#FFF3E0"
+    stroke: "#FF9800"
+    stroke-width: 2
+  }
+}
+
+skip: {
+  label: |md
+    **Skip**
+  |
+  shape: oval
+  style: {
+    fill: "#FFEBEE"
+    stroke: "#F44336"
+    stroke-width: 2
+  }
+}
+
+parse_frontmatter: {
+  label: |md
+    **Parse frontmatter**
+    ```
+    name, description, 
+    resources...
+    ```
+  |
+  shape: rectangle
+  style: {
+    fill: "#E3F2FD"
+    stroke: "#2196F3"
+    stroke-width: 2
+  }
+}
+
+valid_fields: {
+  label: |md
+    **Has `name` and `description`?**
+  |
+  shape: diamond
+  style: {
+    fill: "#FFF3E0"
+    stroke: "#FF9800"
+    stroke-width: 2
+  }
+}
+
+create_skill: {
+  label: |md
+    **Create `Skill` object**
+    ```
+    Skill(
+      name, description,
+      source_dir, resources,
+      frontmatter
+    )
+    ```
+  |
+  shape: rectangle
+  style: {
+    fill: "#E8F5E9"
+    stroke: "#4CAF50"
+    stroke-width: 2
+  }
+}
+
+return_list: {
+  label: |md
+    **Return `List[Skill]`**
+  |
+  shape: oval
+  style: {
+    fill: "#E8F5E9"
+    stroke: "#4CAF50"
+    stroke-width: 3
+  }
+}
+
+start -> iterate
+iterate -> check_skillmd
+
+check_skillmd -> parse_frontmatter: Yes
+parse_frontmatter -> valid_fields
+
+valid_fields -> create_skill: Yes
+create_skill -> iterate: Next dir
+
+check_skillmd -> skip: No
+valid_fields -> skip: No
+skip -> iterate: Next dir
+
+iterate -> return_list: All done

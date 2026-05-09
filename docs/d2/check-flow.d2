@@ -1,0 +1,142 @@
+direction: down
+
+start: {
+  label: |md
+    **`check_sync(source_skills, platform)`**
+  |
+  shape: oval
+  style: {
+    fill: "#E8F5E9"
+    stroke: "#4CAF50"
+    stroke-width: 2
+  }
+}
+
+scan_target: {
+  label: |md
+    **Scan target platform directory**
+    ```
+    scan(~/.kimi/skills/)
+    or
+    scan(~/.hermes/skills/shared/)
+    ```
+  |
+  shape: rectangle
+  style: {
+    fill: "#E3F2FD"
+    stroke: "#2196F3"
+    stroke-width: 2
+  }
+}
+
+compare: {
+  label: |md
+    **Compare source vs target**
+  |
+  shape: rectangle
+  style: {
+    fill: "#E3F2FD"
+    stroke: "#2196F3"
+    stroke-width: 2
+  }
+}
+
+source_in_target: {
+  label: |md
+    **Source skill exists in target?**
+  |
+  shape: diamond
+  style: {
+    fill: "#FFF3E0"
+    stroke: "#FF9800"
+    stroke-width: 2
+  }
+}
+
+content_diff: {
+  label: |md
+    **Content different?**
+  |
+  shape: diamond
+  style: {
+    fill: "#FFF3E0"
+    stroke: "#FF9800"
+    stroke-width: 2
+  }
+}
+
+mark_add: {
+  label: |md
+    **Mark as `ADD`**
+    ```
+    Source has, Target doesn't
+    ```
+  |
+  shape: rectangle
+  style: {
+    fill: "#FFEBEE"
+    stroke: "#F44336"
+    stroke-width: 2
+  }
+}
+
+mark_update: {
+  label: |md
+    **Mark as `UPDATE`**
+    ```
+    Source has, Target has
+    But content differs
+    ```
+  |
+  shape: rectangle
+  style: {
+    fill: "#FFF3E0"
+    stroke: "#FF9800"
+    stroke-width: 2
+  }
+}
+
+mark_ok: {
+  label: |md
+    **Mark as `OK`**
+    ```
+    In sync
+    ```
+  |
+  shape: rectangle
+  style: {
+    fill: "#E8F5E9"
+    stroke: "#4CAF50"
+    stroke-width: 2
+  }
+}
+
+return_results: {
+  label: |md
+    **Return diff report**
+    ```
+    List of (skill, status)
+    status ∈ {ADD, UPDATE, OK}
+    ```
+  |
+  shape: oval
+  style: {
+    fill: "#E8F5E9"
+    stroke: "#4CAF50"
+    stroke-width: 3
+  }
+}
+
+start -> scan_target
+scan_target -> compare
+compare -> source_in_target
+
+source_in_target -> mark_add: No
+source_in_target -> content_diff: Yes
+
+content_diff -> mark_update: Yes
+content_diff -> mark_ok: No
+
+mark_add -> return_results
+mark_update -> return_results
+mark_ok -> return_results
