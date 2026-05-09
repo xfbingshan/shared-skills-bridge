@@ -1,5 +1,9 @@
 # Shared Skills Bridge
 
+[![CI](https://github.com/xfbingshan/shared-skills-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/xfbingshan/shared-skills-bridge/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 让 **VS Code Kimi Code CLI** 和 **Hermes Agent** 共享同一套 Skills。
 
 ## 背景
