@@ -10,5 +10,8 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 
+[tool.setuptools]
+packages = ["src", "scripts"]
+
 [project.scripts]
 skills-bridge = "scripts.install:main"

@@ -22,6 +22,36 @@
 - ⏰ **定时任务** — 内置跨平台定时同步（Windows schtasks / macOS launchd / Linux cron）
 - 🧪 **TDD 开发** — 全模块单元测试 + 集成测试覆盖
 
+## 前提条件
+
+- **Python** >= 3.11
+- **操作系统**：Windows / macOS / Linux
+- **依赖**：零第三方依赖，仅使用 Python 标准库
+
+## 安装
+
+### 方式 A：直接运行（推荐，无需安装）
+
+```bash
+git clone <repository-url>
+cd shared-skills-bridge
+python scripts/install.py --help
+```
+
+### 方式 B：pip 安装（获得 `skills-bridge` CLI）
+
+```bash
+git clone <repository-url>
+cd shared-skills-bridge
+pip install -e .
+
+# 现在可以使用 skills-bridge 命令
+skills-bridge --help
+skills-bridge --source ./shared-skills --target both
+```
+
+> `skills-bridge` 是 `python scripts/install.py` 的快捷入口，两者功能完全一致。
+
 ## 快速开始
 
 ### 1. 准备共享 Skills 源目录
