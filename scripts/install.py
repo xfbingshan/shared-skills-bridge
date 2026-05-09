@@ -17,6 +17,11 @@ from pathlib import Path
 # Allow running directly without package installation
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from src.bidirectional import (
+    discover_hermes_additions,
+    sync_hermes_to_shared,
+    update_baseline,
+)
 from src.installer import InstallResult, check_sync, install_skill, resolve_target_dir
 from src.models import InstallMode, Platform
 from src.scanner import scan_skills
@@ -35,7 +40,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--target",
         choices=["kimi", "hermes", "both"],
-        required=True,
+        required=False,
         help="Target platform to install skills to",
     )
     parser.add_argument(
@@ -53,6 +58,16 @@ def _parse_args() -> argparse.Namespace:
         "--force",
         action="store_true",
         help="Overwrite existing skills",
+    )
+    parser.add_argument(
+        "--bidirectional",
+        action="store_true",
+        help="Also sync skills created directly in Hermes back to shared source and then to Kimi",
+    )
+    parser.add_argument(
+        "--update-baseline",
+        action="store_true",
+        help="Update Hermes baseline to current state (ignore existing skills)",
     )
     return parser.parse_args()
 
@@ -110,6 +125,31 @@ def main() -> int:
     if not source_dir.exists():
         print(f"Error: source directory does not exist: {source_dir}", file=sys.stderr)
         return 1
+
+    # Handle baseline update only
+    if args.update_baseline:
+        update_baseline()
+        print("[BASELINE] Hermes baseline updated to current state.")
+        return 0
+
+    if not args.target:
+        print("Error: --target is required (unless using --update-baseline)", file=sys.stderr)
+        return 1
+
+    # Optional: reverse sync from Hermes to shared source
+    if args.bidirectional:
+        print("[BIDIR] Scanning Hermes for new skills...")
+        hermes_additions = discover_hermes_additions()
+        if hermes_additions:
+            print(f"[BIDIR] Found {len(hermes_additions)} new skill(s) in Hermes:")
+            for s in hermes_additions:
+                print(f"   - {s.name}")
+            copied = sync_hermes_to_shared(hermes_additions, source_dir)
+            if copied:
+                print(f"[BIDIR] Copied to shared source: {', '.join(copied)}")
+        else:
+            print("[BIDIR] No new Hermes skills detected.")
+        print()
 
     skills = scan_skills(source_dir)
     if not skills:

@@ -45,6 +45,10 @@ def parse_frontmatter(content: str) -> Tuple[Dict[str, Any], str]:
     Returns:
         (frontmatter_dict, remaining_body)
     """
+    # Strip UTF-8 BOM if present (common on Windows)
+    if content.startswith("\ufeff"):
+        content = content[1:]
+
     frontmatter: Dict[str, Any] = {}
     body = content
 
