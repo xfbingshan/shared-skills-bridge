@@ -101,12 +101,13 @@ python scripts/install.py --uninstall-scheduler
 shared-skills-bridge/
 ├── docs/
 │   ├── requirements.md         # 需求文档
-│   └── design.md               # 设计文档
+│   ├── design.md               # 设计文档（含 ADR）
+│   └── api.md                  # 模块公共接口文档
 ├── src/
 │   ├── __init__.py
 │   ├── models.py               # Skill 数据模型 + frontmatter 解析
 │   ├── scanner.py              # 扫描共享目录
-│   ├── adapter.py              # 内容适配（Hermes → Kimi）
+│   ├── adapter.py              # 内容适配（策略模式）
 │   ├── installer.py            # 安装/同步/差异检测
 │   ├── bidirectional.py        # 双向同步（基线跟踪）
 │   └── scheduler.py            # 跨平台定时任务（Win/macOS/Linux）
@@ -123,9 +124,13 @@ shared-skills-bridge/
 │   └── test_integration.py     # 5 个集成测试
 ├── scripts/
 │   └── install.py              # CLI 入口
-├── shared-skills/              # 示例共享 skills
-│   └── git-commit-guide/
+├── shared-skills/              # 共享 skills 源目录
+│   ├── git-commit-guide/
+│   ├── clean-code/
+│   ├── clean-architecture/
+│   └── karpathy-guidelines/
 ├── pyproject.toml
+├── CHANGELOG.md
 └── README.md
 ```
 
