@@ -37,6 +37,10 @@ from src.scheduler import (
 )
 
 
+# ---------------------------------------------------------------------------
+# Argument parsing
+# ---------------------------------------------------------------------------
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Share AI skills between Kimi Code CLI and Hermes Agent",
@@ -82,17 +86,17 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--install-scheduler",
         action="store_true",
-        help="Install a Windows scheduled task for automatic sync (Windows only)",
+        help="Install a scheduled task for automatic sync",
     )
     parser.add_argument(
         "--uninstall-scheduler",
         action="store_true",
-        help="Remove the Windows scheduled task (Windows only)",
+        help="Remove the scheduled task",
     )
     parser.add_argument(
         "--scheduler-status",
         action="store_true",
-        help="Show the status of the Windows scheduled task",
+        help="Show the status of the scheduled task",
     )
     parser.add_argument(
         "--interval",
@@ -101,6 +105,95 @@ def _parse_args() -> argparse.Namespace:
         help="Sync interval in minutes for scheduler (default: 5, min: 1)",
     )
     return parser.parse_args()
+
+
+# ---------------------------------------------------------------------------
+# Command handlers (each returns an exit code)
+# ---------------------------------------------------------------------------
+
+def _handle_uninstall_scheduler() -> int:
+    try:
+        if uninstall_scheduler():
+            print("[SCHEDULER] Task removed successfully.")
+            return 0
+        print("[SCHEDULER] Failed to remove task.", file=sys.stderr)
+        return 1
+    except RuntimeError as e:
+        print(f"[SCHEDULER] {e}", file=sys.stderr)
+        return 1
+
+
+def _handle_scheduler_status() -> int:
+    if is_scheduler_installed():
+        info = get_scheduler_info()
+        print("[SCHEDULER] Status: INSTALLED")
+        print(f"[SCHEDULER] Task name: {_TASK_NAME}")
+        if info.get("interval_minutes"):
+            print(f"[SCHEDULER] Interval: every {info['interval_minutes']} minute(s)")
+    else:
+        print("[SCHEDULER] Status: NOT INSTALLED")
+    return 0
+
+
+def _handle_install_scheduler(args: argparse.Namespace) -> int:
+    try:
+        target = args.target or "both"
+        if install_scheduler(args.source, interval_minutes=args.interval, target=target):
+            print("[SCHEDULER] Task installed successfully.")
+            print(f"[SCHEDULER] Will sync every {max(1, args.interval)} minute(s).")
+            print(f"[SCHEDULER] Source: {args.source}")
+            print("[SCHEDULER] Run with --scheduler-status to verify.")
+            return 0
+        print("[SCHEDULER] Failed to install task.", file=sys.stderr)
+        return 1
+    except RuntimeError as e:
+        print(f"[SCHEDULER] {e}", file=sys.stderr)
+        return 1
+
+
+def _handle_update_baseline() -> int:
+    update_baseline()
+    update_kimi_baseline()
+    print("[BASELINE] Hermes and Kimi baselines updated to current state.")
+    return 0
+
+
+def _handle_bidirectional_sync(source_dir: Path) -> None:
+    """Reverse-sync: scan Hermes and Kimi for new skills, copy to shared source."""
+    # Hermes side
+    print("[BIDIR] Scanning Hermes for new skills...")
+    hermes_additions = discover_hermes_additions()
+    if hermes_additions:
+        print(f"[BIDIR] Found {len(hermes_additions)} new skill(s) in Hermes:")
+        for s in hermes_additions:
+            print(f"   - {s.name}")
+        copied = sync_hermes_to_shared(hermes_additions, source_dir)
+        if copied:
+            print(f"[BIDIR] Copied to shared source: {', '.join(copied)}")
+    else:
+        print("[BIDIR] No new Hermes skills detected.")
+
+    # Kimi side
+    print("[BIDIR] Scanning Kimi for new skills...")
+    kimi_additions = discover_kimi_additions()
+    if kimi_additions:
+        print(f"[BIDIR] Found {len(kimi_additions)} new skill(s) in Kimi:")
+        for s in kimi_additions:
+            print(f"   - {s.name}")
+        copied = sync_kimi_to_shared(kimi_additions, source_dir)
+        if copied:
+            print(f"[BIDIR] Copied to shared source: {', '.join(copied)}")
+    else:
+        print("[BIDIR] No new Kimi skills detected.")
+    print()
+
+
+def _resolve_platforms(target: str) -> list[Platform]:
+    if target == "kimi":
+        return [Platform.KIMI]
+    if target == "hermes":
+        return [Platform.HERMES]
+    return [Platform.KIMI, Platform.HERMES]
 
 
 def _install_to_platform(
@@ -140,7 +233,7 @@ def _check_platform(skills: list, platform: Platform) -> None:
     """Print sync differences for a platform."""
     diffs = check_sync(skills, platform)
     if not diffs:
-        print(f"  ✨ {platform.value}: up to date")
+        print(f"  [OK] {platform.value}: up to date")
         return
 
     print(f"\n[DIFF] Differences for {platform.value}:")
@@ -149,93 +242,9 @@ def _check_platform(skills: list, platform: Platform) -> None:
         print(f"  {icon} {diff.skill_name}: {diff.status}")
 
 
-def main() -> int:
-    args = _parse_args()
+def _handle_forward_sync(args: argparse.Namespace) -> int:
+    """Forward-sync: scan shared source and install to target platforms."""
     source_dir = args.source.resolve()
-
-    if not source_dir.exists():
-        print(f"Error: source directory does not exist: {source_dir}", file=sys.stderr)
-        return 1
-
-    # Handle scheduler commands (mutually exclusive with sync)
-    if args.uninstall_scheduler:
-        try:
-            if uninstall_scheduler():
-                print("[SCHEDULER] Task removed successfully.")
-                return 0
-            else:
-                print("[SCHEDULER] Failed to remove task.", file=sys.stderr)
-                return 1
-        except RuntimeError as e:
-            print(f"[SCHEDULER] {e}", file=sys.stderr)
-            return 1
-
-    if args.scheduler_status:
-        if is_scheduler_installed():
-            info = get_scheduler_info()
-            print("[SCHEDULER] Status: INSTALLED")
-            print(f"[SCHEDULER] Task name: {_TASK_NAME}")
-            if info.get("interval_minutes"):
-                print(f"[SCHEDULER] Interval: every {info['interval_minutes']} minute(s)")
-        else:
-            print("[SCHEDULER] Status: NOT INSTALLED")
-        return 0
-
-    if args.install_scheduler:
-        try:
-            if install_scheduler(source_dir, interval_minutes=args.interval, target=args.target or "both"):
-                print("[SCHEDULER] Task installed successfully.")
-                print(f"[SCHEDULER] Will sync every {max(1, args.interval)} minute(s).")
-                print(f"[SCHEDULER] Source: {source_dir}")
-                print("[SCHEDULER] Run with --scheduler-status to verify.")
-                return 0
-            else:
-                print("[SCHEDULER] Failed to install task.", file=sys.stderr)
-                return 1
-        except RuntimeError as e:
-            print(f"[SCHEDULER] {e}", file=sys.stderr)
-            return 1
-
-    # Handle baseline update only
-    if args.update_baseline:
-        update_baseline()
-        update_kimi_baseline()
-        print("[BASELINE] Hermes and Kimi baselines updated to current state.")
-        return 0
-
-    if not args.target:
-        print("Error: --target is required (unless using scheduler/baseline commands)", file=sys.stderr)
-        return 1
-
-    # Optional: reverse sync from both platforms to shared source
-    if args.bidirectional:
-        # Hermes side
-        print("[BIDIR] Scanning Hermes for new skills...")
-        hermes_additions = discover_hermes_additions()
-        if hermes_additions:
-            print(f"[BIDIR] Found {len(hermes_additions)} new skill(s) in Hermes:")
-            for s in hermes_additions:
-                print(f"   - {s.name}")
-            copied = sync_hermes_to_shared(hermes_additions, source_dir)
-            if copied:
-                print(f"[BIDIR] Copied to shared source: {', '.join(copied)}")
-        else:
-            print("[BIDIR] No new Hermes skills detected.")
-
-        # Kimi side
-        print("[BIDIR] Scanning Kimi for new skills...")
-        kimi_additions = discover_kimi_additions()
-        if kimi_additions:
-            print(f"[BIDIR] Found {len(kimi_additions)} new skill(s) in Kimi:")
-            for s in kimi_additions:
-                print(f"   - {s.name}")
-            copied = sync_kimi_to_shared(kimi_additions, source_dir)
-            if copied:
-                print(f"[BIDIR] Copied to shared source: {', '.join(copied)}")
-        else:
-            print("[BIDIR] No new Kimi skills detected.")
-        print()
-
     skills = scan_skills(source_dir)
     if not skills:
         print(f"No valid skills found in {source_dir}")
@@ -246,13 +255,7 @@ def main() -> int:
         print(f"   - {s.name}")
 
     mode = InstallMode(args.mode)
-    platforms: list[Platform] = []
-    if args.target == "kimi":
-        platforms = [Platform.KIMI]
-    elif args.target == "hermes":
-        platforms = [Platform.HERMES]
-    else:
-        platforms = [Platform.KIMI, Platform.HERMES]
+    platforms = _resolve_platforms(args.target)
 
     if args.check:
         for plat in platforms:
@@ -265,6 +268,41 @@ def main() -> int:
         exit_code = max(exit_code, code)
 
     return exit_code
+
+
+# ---------------------------------------------------------------------------
+# Main entry point
+# ---------------------------------------------------------------------------
+
+def main() -> int:
+    args = _parse_args()
+    source_dir = args.source.resolve()
+
+    if not source_dir.exists():
+        print(f"Error: source directory does not exist: {source_dir}", file=sys.stderr)
+        return 1
+
+    # Mutually-exclusive command routing
+    if args.uninstall_scheduler:
+        return _handle_uninstall_scheduler()
+
+    if args.scheduler_status:
+        return _handle_scheduler_status()
+
+    if args.install_scheduler:
+        return _handle_install_scheduler(args)
+
+    if args.update_baseline:
+        return _handle_update_baseline()
+
+    if not args.target:
+        print("Error: --target is required (unless using scheduler/baseline commands)", file=sys.stderr)
+        return 1
+
+    if args.bidirectional:
+        _handle_bidirectional_sync(source_dir)
+
+    return _handle_forward_sync(args)
 
 
 if __name__ == "__main__":
