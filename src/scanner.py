@@ -33,7 +33,7 @@ def scan_skills(source_dir: Path) -> List[Skill]:
 
         try:
             content = skill_md.read_text(encoding="utf-8")
-        except Exception:
+        except (OSError, UnicodeDecodeError):
             continue
 
         frontmatter, _ = parse_frontmatter(content)

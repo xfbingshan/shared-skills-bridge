@@ -144,7 +144,7 @@ def install_skill(
         if mode is InstallMode.LINK:
             _create_link(skill.source_dir, target)
             return InstallResult.LINKED
-    except Exception:
+    except OSError:
         return InstallResult.ERROR
 
     return InstallResult.ERROR
