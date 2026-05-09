@@ -24,7 +24,7 @@ def _load_baseline(path: Path) -> Set[str]:
             data = json.load(f)
         if isinstance(data, list):
             return set(data)
-    except Exception:
+    except (json.JSONDecodeError, OSError):
         pass
     return set()
 
@@ -32,6 +32,62 @@ def _load_baseline(path: Path) -> Set[str]:
 def _save_baseline(names: Set[str], path: Path) -> None:
     """Persist the set of known skill names to a JSON file."""
     path.write_text(json.dumps(sorted(names), indent=2), encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Generic helpers (DRY)
+# ---------------------------------------------------------------------------
+
+def _discover_additions(
+    skills_dir: Path,
+    baseline_path: Path,
+    exclude: Set[str] | None = None,
+) -> List[Skill]:
+    """Scan *skills_dir* and return skills not recorded in *baseline_path*.
+
+    On first run (no baseline), records current contents as baseline and
+    returns an empty list.
+    """
+    baseline = _load_baseline(baseline_path)
+    current_skills = scan_skills(skills_dir)
+    current_names = {s.name for s in current_skills}
+
+    if not baseline:
+        _save_baseline(current_names, baseline_path)
+        return []
+
+    new_names = current_names - baseline
+    if exclude:
+        new_names -= exclude
+    return [s for s in current_skills if s.name in new_names]
+
+
+def _update_baseline(
+    skills_dir: Path,
+    baseline_path: Path,
+    exclude: Set[str] | None = None,
+) -> None:
+    """Re-scan *skills_dir* and persist names to *baseline_path*."""
+    current_skills = scan_skills(skills_dir)
+    current_names = {s.name for s in current_skills}
+    if exclude:
+        current_names -= exclude
+    _save_baseline(current_names, baseline_path)
+
+
+def _sync_to_shared(
+    additions: List[Skill],
+    shared_source_dir: Path,
+) -> List[str]:
+    """Copy *additions* into the shared source directory."""
+    copied: List[str] = []
+    for skill in additions:
+        target = shared_source_dir / skill.name
+        if target.exists():
+            continue
+        shutil.copytree(skill.source_dir, target)
+        copied.append(skill.name)
+    return copied
 
 
 # ---------------------------------------------------------------------------
@@ -47,27 +103,12 @@ def discover_hermes_additions(
     hermes_skills_dir: Path | None = None,
     baseline_path: Path | None = None,
 ) -> List[Skill]:
-    """Scan Hermes skills directory and return newly-added user skills.
-
-    On the first run (no baseline file), the current contents are recorded
-    as the baseline and an empty list is returned.
-    """
+    """Scan Hermes skills directory and return newly-added user skills."""
     if hermes_skills_dir is None:
         hermes_skills_dir = _get_hermes_home() / "skills"
     if baseline_path is None:
         baseline_path = hermes_skills_dir / _BASELINE_FILENAME
-
-    baseline = _load_baseline(baseline_path)
-    current_skills = scan_skills(hermes_skills_dir)
-    current_names = {s.name for s in current_skills}
-
-    if not baseline:
-        _save_baseline(current_names, baseline_path)
-        return []
-
-    new_names = current_names - baseline
-    new_names.discard("shared")
-    return [s for s in current_skills if s.name in new_names]
+    return _discover_additions(hermes_skills_dir, baseline_path, exclude={"shared"})
 
 
 def update_baseline(
@@ -79,11 +120,7 @@ def update_baseline(
         hermes_skills_dir = _get_hermes_home() / "skills"
     if baseline_path is None:
         baseline_path = hermes_skills_dir / _BASELINE_FILENAME
-
-    current_skills = scan_skills(hermes_skills_dir)
-    current_names = {s.name for s in current_skills}
-    current_names.discard("shared")
-    _save_baseline(current_names, baseline_path)
+    _update_baseline(hermes_skills_dir, baseline_path, exclude={"shared"})
 
 
 def sync_hermes_to_shared(
@@ -91,14 +128,7 @@ def sync_hermes_to_shared(
     shared_source_dir: Path,
 ) -> List[str]:
     """Copy Hermes-side additions into the shared source directory."""
-    copied: List[str] = []
-    for skill in additions:
-        target = shared_source_dir / skill.name
-        if target.exists():
-            continue
-        shutil.copytree(skill.source_dir, target)
-        copied.append(skill.name)
-    return copied
+    return _sync_to_shared(additions, shared_source_dir)
 
 
 # ---------------------------------------------------------------------------
@@ -123,26 +153,12 @@ def discover_kimi_additions(
     kimi_skills_dir: Path | None = None,
     baseline_path: Path | None = None,
 ) -> List[Skill]:
-    """Scan Kimi skills directory and return newly-added user skills.
-
-    On the first run (no baseline file), the current contents are recorded
-    as the baseline and an empty list is returned.
-    """
+    """Scan Kimi skills directory and return newly-added user skills."""
     if kimi_skills_dir is None:
         kimi_skills_dir = _resolve_kimi_skills_dir()
     if baseline_path is None:
         baseline_path = kimi_skills_dir / _KIMI_BASELINE_FILENAME
-
-    baseline = _load_baseline(baseline_path)
-    current_skills = scan_skills(kimi_skills_dir)
-    current_names = {s.name for s in current_skills}
-
-    if not baseline:
-        _save_baseline(current_names, baseline_path)
-        return []
-
-    new_names = current_names - baseline
-    return [s for s in current_skills if s.name in new_names]
+    return _discover_additions(kimi_skills_dir, baseline_path)
 
 
 def update_kimi_baseline(
@@ -154,10 +170,7 @@ def update_kimi_baseline(
         kimi_skills_dir = _resolve_kimi_skills_dir()
     if baseline_path is None:
         baseline_path = kimi_skills_dir / _KIMI_BASELINE_FILENAME
-
-    current_skills = scan_skills(kimi_skills_dir)
-    current_names = {s.name for s in current_skills}
-    _save_baseline(current_names, baseline_path)
+    _update_baseline(kimi_skills_dir, baseline_path)
 
 
 def sync_kimi_to_shared(
@@ -165,11 +178,4 @@ def sync_kimi_to_shared(
     shared_source_dir: Path,
 ) -> List[str]:
     """Copy Kimi-side additions into the shared source directory."""
-    copied: List[str] = []
-    for skill in additions:
-        target = shared_source_dir / skill.name
-        if target.exists():
-            continue
-        shutil.copytree(skill.source_dir, target)
-        copied.append(skill.name)
-    return copied
+    return _sync_to_shared(additions, shared_source_dir)
