@@ -78,8 +78,8 @@ class TestInstallSkillCopy(unittest.TestCase):
             result = install_skill(skill, Platform.HERMES, InstallMode.COPY, target_root=target_root)
 
             self.assertEqual(result, InstallResult.COPIED)
-            # Hermes gets a 'shared' subdir
-            self.assertTrue((target_root / "shared" / "my-skill" / "SKILL.md").exists())
+            # target_root already includes the 'shared' subdir for Hermes
+            self.assertTrue((target_root / "my-skill" / "SKILL.md").exists())
 
     def test_skip_existing_without_force(self):
         with tempfile.TemporaryDirectory() as tmpdir:

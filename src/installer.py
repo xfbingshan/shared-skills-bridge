@@ -65,7 +65,8 @@ def _compute_target_path(skill: Skill, platform: Platform, target_root: Path) ->
     if platform is Platform.KIMI:
         return target_root / skill.name
     if platform is Platform.HERMES:
-        return target_root / "shared" / skill.name
+        # target_root already points to ~/.hermes/skills/shared
+        return target_root / skill.name
     raise ValueError(f"Unsupported platform: {platform}")
 
 
