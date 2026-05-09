@@ -39,86 +39,141 @@ class Skill:
         return self.source_dir / "SKILL.md"
 
 
+# ---------------------------------------------------------------------------
+# Frontmatter parsing
+# ---------------------------------------------------------------------------
+
+_FRONTMATTER_DELIMITER = re.compile(r"\n---\s*\n")
+
+
+def _strip_bom(content: str) -> str:
+    """Strip UTF-8 BOM if present (common on Windows)."""
+    if content.startswith("\ufeff"):
+        return content[1:]
+    return content
+
+
+def _extract_yaml_block(content: str) -> Tuple[str | None, str]:
+    """Extract YAML frontmatter block and remaining body from markdown.
+
+    Returns:
+        (yaml_block, body) — yaml_block is None if no frontmatter found.
+    """
+    if not content.startswith("---"):
+        return None, content
+
+    end_match = _FRONTMATTER_DELIMITER.search(content[3:])
+    if not end_match:
+        return None, content
+
+    yaml_block = content[3 : end_match.start() + 3]
+    body = content[end_match.end() + 3 :]
+    return yaml_block, body
+
+
+def _parse_scalar_value(value: str) -> Any:
+    """Parse a single scalar YAML value.
+
+    Handles:
+    - Empty list: []
+    - Non-empty list: [a, b, c]
+    - Quoted strings: "foo", 'bar'
+    - Plain strings
+    """
+    value = value.strip()
+
+    # List values
+    if value.startswith("[") and value.endswith("]"):
+        inner = value[1:-1].strip()
+        if not inner:
+            return []
+        return [item.strip().strip('"\'') for item in inner.split(",")]
+
+    # Strip quotes from scalar strings
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
+        return value[1:-1]
+
+    return value
+
+
+def _parse_multiline_value(lines: list[str], start_idx: int) -> Tuple[str, int]:
+    """Parse a multiline YAML value (| or >).
+
+    Returns:
+        (collected_value, next_index)
+    """
+    i = start_idx
+
+    # Determine base indentation from next non-empty line
+    base_indent = 0
+    while i < len(lines):
+        if lines[i].strip():
+            base_indent = len(lines[i]) - len(lines[i].lstrip())
+            break
+        i += 1
+
+    collected: list[str] = []
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.lstrip()
+
+        # Stop at new top-level key (less indented, contains colon)
+        if stripped and ":" in stripped:
+            indent = len(line) - len(stripped)
+            if indent < base_indent:
+                break
+
+        if line.strip():
+            collected.append(line.strip())
+        i += 1
+
+    return "\n".join(collected), i
+
+
+def _parse_yaml_block(yaml_content: str) -> Dict[str, Any]:
+    """Parse a YAML frontmatter string into a dictionary.
+
+    Supports simple scalars, lists, and multiline values (|, >).
+    """
+    frontmatter: Dict[str, Any] = {}
+    lines = yaml_content.strip().split("\n")
+    i = 0
+
+    while i < len(lines):
+        line = lines[i].rstrip()
+        i += 1
+
+        if not line or line.startswith("#"):
+            continue
+        if ":" not in line:
+            continue
+
+        key, raw_value = line.split(":", 1)
+        key = key.strip()
+        raw_value = raw_value.strip()
+
+        # Multiline values
+        if raw_value in ("|", ">"):
+            value, i = _parse_multiline_value(lines, i)
+            frontmatter[key] = value
+            continue
+
+        frontmatter[key] = _parse_scalar_value(raw_value)
+
+    return frontmatter
+
+
 def parse_frontmatter(content: str) -> Tuple[Dict[str, Any], str]:
     """Parse YAML frontmatter from a markdown string.
 
     Returns:
         (frontmatter_dict, remaining_body)
     """
-    # Strip UTF-8 BOM if present (common on Windows)
-    if content.startswith("\ufeff"):
-        content = content[1:]
+    content = _strip_bom(content)
+    yaml_block, body = _extract_yaml_block(content)
 
-    frontmatter: Dict[str, Any] = {}
-    body = content
+    if yaml_block is None:
+        return {}, body
 
-    if not content.startswith("---"):
-        return frontmatter, body
-
-    # Find the closing ---
-    end_match = re.search(r"\n---\s*\n", content[3:])
-    if not end_match:
-        return frontmatter, body
-
-    yaml_content = content[3 : end_match.start() + 3]
-    body = content[end_match.end() + 3 :]
-
-    # Parse YAML frontmatter line by line
-    lines = yaml_content.strip().split("\n")
-    i = 0
-    while i < len(lines):
-        line = lines[i].rstrip()
-        i += 1
-        if not line or line.startswith("#"):
-            continue
-        if ":" not in line:
-            continue
-
-        key, value = line.split(":", 1)
-        key = key.strip()
-        value = value.strip()
-
-        # Multiline values: |  or  >
-        if value in ("|", ">"):
-            collected: list[str] = []
-            # Determine base indentation from next non-empty line
-            while i < len(lines):
-                if lines[i].strip():
-                    base_indent = len(lines[i]) - len(lines[i].lstrip())
-                    break
-                i += 1
-            else:
-                base_indent = 0
-
-            while i < len(lines):
-                next_line = lines[i]
-                # Stop if we hit a new top-level key (no indent or less indent)
-                if next_line.strip() and not next_line.startswith(" " * (base_indent + 1)) and not next_line.startswith("\t"):
-                    # Check if it's a new key
-                    stripped = next_line.lstrip()
-                    if ":" in stripped and len(next_line) - len(next_line.lstrip()) < base_indent:
-                        break
-                if next_line.strip():
-                    collected.append(next_line.strip())
-                i += 1
-            value = "\n".join(collected)
-            frontmatter[key] = value
-            continue
-
-        # List values: [a, b, c]
-        if value.startswith("[") and value.endswith("]"):
-            inner = value[1:-1]
-            if not inner.strip():
-                frontmatter[key] = []
-            else:
-                items = [item.strip().strip('"\'') for item in inner.split(",")]
-                frontmatter[key] = items
-            continue
-
-        # Strip quotes from scalar values
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
-            value = value[1:-1]
-
-        frontmatter[key] = value
-
+    frontmatter = _parse_yaml_block(yaml_block)
     return frontmatter, body
