@@ -28,6 +28,13 @@ from src.bidirectional import (
 from src.installer import InstallResult, check_sync, install_skill, resolve_target_dir
 from src.models import InstallMode, Platform
 from src.scanner import scan_skills
+from src.scheduler import (
+    _TASK_NAME,
+    get_scheduler_info,
+    install_scheduler,
+    is_scheduler_installed,
+    uninstall_scheduler,
+)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -71,6 +78,27 @@ def _parse_args() -> argparse.Namespace:
         "--update-baseline",
         action="store_true",
         help="Update both Hermes and Kimi baselines to current state",
+    )
+    parser.add_argument(
+        "--install-scheduler",
+        action="store_true",
+        help="Install a Windows scheduled task for automatic sync (Windows only)",
+    )
+    parser.add_argument(
+        "--uninstall-scheduler",
+        action="store_true",
+        help="Remove the Windows scheduled task (Windows only)",
+    )
+    parser.add_argument(
+        "--scheduler-status",
+        action="store_true",
+        help="Show the status of the Windows scheduled task",
+    )
+    parser.add_argument(
+        "--interval",
+        type=int,
+        default=5,
+        help="Sync interval in minutes for scheduler (default: 5, min: 1)",
     )
     return parser.parse_args()
 
@@ -129,6 +157,45 @@ def main() -> int:
         print(f"Error: source directory does not exist: {source_dir}", file=sys.stderr)
         return 1
 
+    # Handle scheduler commands (mutually exclusive with sync)
+    if args.uninstall_scheduler:
+        try:
+            if uninstall_scheduler():
+                print("[SCHEDULER] Task removed successfully.")
+                return 0
+            else:
+                print("[SCHEDULER] Failed to remove task.", file=sys.stderr)
+                return 1
+        except RuntimeError as e:
+            print(f"[SCHEDULER] {e}", file=sys.stderr)
+            return 1
+
+    if args.scheduler_status:
+        if is_scheduler_installed():
+            info = get_scheduler_info()
+            print("[SCHEDULER] Status: INSTALLED")
+            print(f"[SCHEDULER] Task name: {_TASK_NAME}")
+            if info.get("interval_minutes"):
+                print(f"[SCHEDULER] Interval: every {info['interval_minutes']} minute(s)")
+        else:
+            print("[SCHEDULER] Status: NOT INSTALLED")
+        return 0
+
+    if args.install_scheduler:
+        try:
+            if install_scheduler(source_dir, interval_minutes=args.interval, target=args.target or "both"):
+                print("[SCHEDULER] Task installed successfully.")
+                print(f"[SCHEDULER] Will sync every {max(1, args.interval)} minute(s).")
+                print(f"[SCHEDULER] Source: {source_dir}")
+                print("[SCHEDULER] Run with --scheduler-status to verify.")
+                return 0
+            else:
+                print("[SCHEDULER] Failed to install task.", file=sys.stderr)
+                return 1
+        except RuntimeError as e:
+            print(f"[SCHEDULER] {e}", file=sys.stderr)
+            return 1
+
     # Handle baseline update only
     if args.update_baseline:
         update_baseline()
@@ -137,7 +204,7 @@ def main() -> int:
         return 0
 
     if not args.target:
-        print("Error: --target is required (unless using --update-baseline)", file=sys.stderr)
+        print("Error: --target is required (unless using scheduler/baseline commands)", file=sys.stderr)
         return 1
 
     # Optional: reverse sync from both platforms to shared source
