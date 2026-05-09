@@ -1,5 +1,6 @@
-"""Bidirectional sync — detects new skills created in Hermes and backfills them
-to the shared source directory so they can be installed to Kimi as well.
+"""Bidirectional sync — detects new skills created in either Hermes or Kimi
+and backfills them to the shared source directory so they propagate to both
+platforms.
 """
 
 import json
@@ -11,10 +12,11 @@ from src.models import Skill
 from src.scanner import scan_skills
 
 _BASELINE_FILENAME = ".hermes-baseline.json"
+_KIMI_BASELINE_FILENAME = ".kimi-baseline.json"
 
 
 def _load_baseline(path: Path) -> Set[str]:
-    """Load the set of known Hermes skill names from a JSON file."""
+    """Load the set of known skill names from a JSON file."""
     if not path.exists():
         return set()
     try:
@@ -28,9 +30,13 @@ def _load_baseline(path: Path) -> Set[str]:
 
 
 def _save_baseline(names: Set[str], path: Path) -> None:
-    """Persist the set of known Hermes skill names to a JSON file."""
+    """Persist the set of known skill names to a JSON file."""
     path.write_text(json.dumps(sorted(names), indent=2), encoding="utf-8")
 
+
+# ---------------------------------------------------------------------------
+# Hermes side
+# ---------------------------------------------------------------------------
 
 def _get_hermes_home() -> Path:
     """Return the Hermes home directory (~/.hermes)."""
@@ -43,20 +49,8 @@ def discover_hermes_additions(
 ) -> List[Skill]:
     """Scan Hermes skills directory and return newly-added user skills.
 
-    On the first run (no baseline file), the current contents of the
-    Hermes skills directory are recorded as the baseline and an empty
-    list is returned. Subsequent runs detect only directories that have
-    appeared *after* the baseline was established.
-
-    The ``shared/`` subdirectory is always ignored because it is managed
-    by the forward-sync process.
-
-    Args:
-        hermes_skills_dir: Override path to ``~/.hermes/skills/``.
-        baseline_path: Override path to the baseline JSON file.
-
-    Returns:
-        List of :class:`Skill` objects that are new since baseline.
+    On the first run (no baseline file), the current contents are recorded
+    as the baseline and an empty list is returned.
     """
     if hermes_skills_dir is None:
         hermes_skills_dir = _get_hermes_home() / "skills"
@@ -64,22 +58,15 @@ def discover_hermes_additions(
         baseline_path = hermes_skills_dir / _BASELINE_FILENAME
 
     baseline = _load_baseline(baseline_path)
-
-    # Scan current Hermes skills (flat structure under ~/.hermes/skills/)
     current_skills = scan_skills(hermes_skills_dir)
     current_names = {s.name for s in current_skills}
 
-    # On first run: establish baseline and return empty
     if not baseline:
         _save_baseline(current_names, baseline_path)
         return []
 
-    # Find skills that exist now but were NOT in the baseline
     new_names = current_names - baseline
-
-    # Filter out the 'shared' directory (managed by forward sync)
     new_names.discard("shared")
-
     return [s for s in current_skills if s.name in new_names]
 
 
@@ -87,12 +74,7 @@ def update_baseline(
     hermes_skills_dir: Path | None = None,
     baseline_path: Path | None = None,
 ) -> None:
-    """Re-scan Hermes and update the baseline to match current state.
-
-    Call this after intentionally installing new skills into Hermes
-    that you do NOT want to be treated as user additions (e.g. after
-    running ``hermes skills install`` for official skills).
-    """
+    """Re-scan Hermes and update the baseline to match current state."""
     if hermes_skills_dir is None:
         hermes_skills_dir = _get_hermes_home() / "skills"
     if baseline_path is None:
@@ -108,15 +90,81 @@ def sync_hermes_to_shared(
     additions: List[Skill],
     shared_source_dir: Path,
 ) -> List[str]:
-    """Copy Hermes-side additions into the shared source directory.
+    """Copy Hermes-side additions into the shared source directory."""
+    copied: List[str] = []
+    for skill in additions:
+        target = shared_source_dir / skill.name
+        if target.exists():
+            continue
+        shutil.copytree(skill.source_dir, target)
+        copied.append(skill.name)
+    return copied
 
-    Args:
-        additions: Skills discovered by :func:`discover_hermes_additions`.
-        shared_source_dir: Root of the shared skills source tree.
 
-    Returns:
-        List of skill names that were actually copied.
+# ---------------------------------------------------------------------------
+# Kimi side
+# ---------------------------------------------------------------------------
+
+def _resolve_kimi_skills_dir() -> Path:
+    """Return the active Kimi skills directory (first existing candidate)."""
+    home = Path.home()
+    candidates = [
+        home / ".config" / "agents" / "skills",
+        home / ".kimi" / "skills",
+        home / ".claude" / "skills",
+    ]
+    for cand in candidates:
+        if cand.exists():
+            return cand
+    return candidates[0]
+
+
+def discover_kimi_additions(
+    kimi_skills_dir: Path | None = None,
+    baseline_path: Path | None = None,
+) -> List[Skill]:
+    """Scan Kimi skills directory and return newly-added user skills.
+
+    On the first run (no baseline file), the current contents are recorded
+    as the baseline and an empty list is returned.
     """
+    if kimi_skills_dir is None:
+        kimi_skills_dir = _resolve_kimi_skills_dir()
+    if baseline_path is None:
+        baseline_path = kimi_skills_dir / _KIMI_BASELINE_FILENAME
+
+    baseline = _load_baseline(baseline_path)
+    current_skills = scan_skills(kimi_skills_dir)
+    current_names = {s.name for s in current_skills}
+
+    if not baseline:
+        _save_baseline(current_names, baseline_path)
+        return []
+
+    new_names = current_names - baseline
+    return [s for s in current_skills if s.name in new_names]
+
+
+def update_kimi_baseline(
+    kimi_skills_dir: Path | None = None,
+    baseline_path: Path | None = None,
+) -> None:
+    """Re-scan Kimi and update the baseline to match current state."""
+    if kimi_skills_dir is None:
+        kimi_skills_dir = _resolve_kimi_skills_dir()
+    if baseline_path is None:
+        baseline_path = kimi_skills_dir / _KIMI_BASELINE_FILENAME
+
+    current_skills = scan_skills(kimi_skills_dir)
+    current_names = {s.name for s in current_skills}
+    _save_baseline(current_names, baseline_path)
+
+
+def sync_kimi_to_shared(
+    additions: List[Skill],
+    shared_source_dir: Path,
+) -> List[str]:
+    """Copy Kimi-side additions into the shared source directory."""
     copied: List[str] = []
     for skill in additions:
         target = shared_source_dir / skill.name

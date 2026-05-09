@@ -19,8 +19,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.bidirectional import (
     discover_hermes_additions,
+    discover_kimi_additions,
     sync_hermes_to_shared,
+    sync_kimi_to_shared,
     update_baseline,
+    update_kimi_baseline,
 )
 from src.installer import InstallResult, check_sync, install_skill, resolve_target_dir
 from src.models import InstallMode, Platform
@@ -67,7 +70,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--update-baseline",
         action="store_true",
-        help="Update Hermes baseline to current state (ignore existing skills)",
+        help="Update both Hermes and Kimi baselines to current state",
     )
     return parser.parse_args()
 
@@ -129,15 +132,17 @@ def main() -> int:
     # Handle baseline update only
     if args.update_baseline:
         update_baseline()
-        print("[BASELINE] Hermes baseline updated to current state.")
+        update_kimi_baseline()
+        print("[BASELINE] Hermes and Kimi baselines updated to current state.")
         return 0
 
     if not args.target:
         print("Error: --target is required (unless using --update-baseline)", file=sys.stderr)
         return 1
 
-    # Optional: reverse sync from Hermes to shared source
+    # Optional: reverse sync from both platforms to shared source
     if args.bidirectional:
+        # Hermes side
         print("[BIDIR] Scanning Hermes for new skills...")
         hermes_additions = discover_hermes_additions()
         if hermes_additions:
@@ -149,6 +154,19 @@ def main() -> int:
                 print(f"[BIDIR] Copied to shared source: {', '.join(copied)}")
         else:
             print("[BIDIR] No new Hermes skills detected.")
+
+        # Kimi side
+        print("[BIDIR] Scanning Kimi for new skills...")
+        kimi_additions = discover_kimi_additions()
+        if kimi_additions:
+            print(f"[BIDIR] Found {len(kimi_additions)} new skill(s) in Kimi:")
+            for s in kimi_additions:
+                print(f"   - {s.name}")
+            copied = sync_kimi_to_shared(kimi_additions, source_dir)
+            if copied:
+                print(f"[BIDIR] Copied to shared source: {', '.join(copied)}")
+        else:
+            print("[BIDIR] No new Kimi skills detected.")
         print()
 
     skills = scan_skills(source_dir)
