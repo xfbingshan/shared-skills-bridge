@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shared-skills-bridge"
+version = "0.1.0"
+description = "Bridge to share AI skills between Kimi Code CLI and Hermes Agent"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+[project.scripts]
+skills-bridge = "scripts.install:main"
