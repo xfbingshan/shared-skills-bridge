@@ -82,7 +82,7 @@ git log --format="%an <%ae>" -1
 python -m unittest discover -s tests -v
 
 # 2. 敏感信息扫描
-grep -r "<USERNAME>\|<USERNAME>\|<EMAIL>" --include="*.py" --include="*.md" --include="*.toml" .
+grep -r "<USERNAME>\|<EMAIL>" --include="*.py" --include="*.md" --include="*.toml" .
 
 # 3. 文档同步检查
 # - API 变更 → docs/api.md
