@@ -25,7 +25,7 @@ platforms: [windows, macos, linux]
 ### Green — 最小实现使测试通过
 
 - 在 `src/` 下实现功能代码
-- **标准库优先**，禁止引入第三方依赖（除非经 ADR 流程论证）
+- **标准库优先**，第三方依赖需经评估并明确记录在 `pyproject.toml` / `requirements.txt` 中，版本必须锁定
 - 优先使用 `pathlib.Path` 处理路径，禁止字符串拼接路径
 - 异常处理捕获**具体类型**，禁止裸 `except Exception`
 - 函数不超过 20 行核心逻辑；超过则拆分
@@ -56,6 +56,23 @@ platforms: [windows, macos, linux]
 - **策略模式**：平台差异用 `_ADAPTERS: dict[Platform, Callable]` 注册，新增平台零侵入既有代码
 - **抽象后端**：跨平台模块（如定时任务）使用 ABC + 具体实现，自动按 `sys.platform` 分发
 - **依赖方向**：`src/` 不依赖 `scripts/`，`tests/` 可依赖 `src/`
+
+### 依赖管理
+
+**原则**：标准库优先，但不强制零依赖。引入第三方依赖必须满足可维护性。
+
+| 场景 | 处理方式 |
+|------|---------|
+| 标准库可满足 | 优先使用标准库 |
+| 标准库难以满足 | 可引入第三方，需在 `pyproject.toml` / `requirements.txt` 完整声明 |
+| 版本锁定 | 所有依赖必须指定最小版本（如 `>=1.0.0`）和最大兼容版本 |
+| 开发依赖 | 区分 `dependencies` 与 `dev-dependencies`（pytest、ruff 等） |
+| 引入审批 | 在 `docs/requirements.md` 或 ADR 中记录引入理由和替代方案评估 |
+
+**禁止**：
+- 隐式依赖（代码中 `import xxx` 但未在配置文件中声明）
+- 未锁定版本的依赖（`requests` 而非 `requests>=2.28.0,<3.0.0`）
+- 已弃用/长期无维护的库
 
 ### 类型注解
 
@@ -140,8 +157,16 @@ git config --local user.email "<github-username>@users.noreply.github.com"
 
 - **触发**：push 到 `main` / PR 到 `main`
 - **矩阵**：Ubuntu + Windows + macOS × Python 3.11 + 3.12
-- **步骤**：checkout → setup Python → `python -m unittest discover -s tests -v`
-- **零依赖项目**：无需 `pip install` 步骤
+- **步骤**：
+  ```yaml
+  - uses: actions/checkout@v4
+  - uses: actions/setup-python@v5
+    with:
+      python-version: ${{ matrix.python-version }}
+  - run: pip install -e .          # 如有依赖
+  - run: python -m unittest discover -s tests -v
+  ```
+- **依赖安装**：零依赖项目可跳过 `pip install`；有依赖项目必须包含
 - **徽章**：README 顶部显示 CI 状态、Python 版本、License
 
 ### 质量门禁
